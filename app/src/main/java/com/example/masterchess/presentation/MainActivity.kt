@@ -271,12 +271,6 @@ fun GameScreen(gameId: String, navController: NavController) {
                     return@TapInputManager
                 }
 
-                if (userMove == "CLEAR") {
-                    livePreview = ""
-                    tapSequence = emptyList()
-                    return@TapInputManager
-                }
-
                 livePreview = ""
                 turnStatus = "sending"
                 moveHistory = moveHistory + userMove
@@ -399,6 +393,7 @@ fun GameScreen(gameId: String, navController: NavController) {
 
             Button(
                 onClick = {
+                    manager.clear()
                     livePreview = ""
                     tapSequence = emptyList()
                 },

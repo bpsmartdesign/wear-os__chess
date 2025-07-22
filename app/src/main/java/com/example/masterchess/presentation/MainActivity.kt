@@ -33,6 +33,7 @@ import androidx.wear.tooling.preview.devices.WearDevices
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.example.masterchess.logic.TapInputManager
 import com.example.masterchess.network.convertSANMoveToVibrations
@@ -83,7 +84,7 @@ fun AppNavHost(context: Context = LocalContext.current) {
         }
 
         composable("game") {
-            GameScreen(gameId)
+            GameScreen(gameId, navController)
         }
     }
 }
@@ -241,7 +242,7 @@ fun ColorSelectScreen(onColorChosen: (String) -> Unit) {
 }
 
 @Composable
-fun GameScreen(gameId: String) {
+fun GameScreen(gameId: String, navController: NavController) {
     val context = LocalContext.current
     //val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
     //val vibrator = vibratorManager.getDefaultVibrator();
@@ -257,6 +258,25 @@ fun GameScreen(gameId: String) {
     val manager = remember {
         TapInputManager(
             onMoveReady = { userMove ->
+                if (userMove == "RESET") {
+                    moveHistory = emptyList()
+                    livePreview = ""
+                    tapSequence = emptyList()
+                    turnStatus = "loading"
+
+                    navController.navigate("welcome") {
+                        popUpTo("welcome") { inclusive = true }
+                    }
+
+                    return@TapInputManager
+                }
+
+                if (userMove == "CLEAR") {
+                    livePreview = ""
+                    tapSequence = emptyList()
+                    return@TapInputManager
+                }
+
                 livePreview = ""
                 turnStatus = "sending"
                 moveHistory = moveHistory + userMove
@@ -374,6 +394,34 @@ fun GameScreen(gameId: String) {
                     .padding(bottom = 4.dp),
                 textAlign = TextAlign.Center
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    livePreview = ""
+                    tapSequence = emptyList()
+                },
+                modifier = Modifier
+                    .defaultMinSize(
+                        minWidth = 100.dp,
+                        minHeight = 10.dp,
+                        )
+                    .height(30.dp)
+                    .padding(horizontal = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = Color.Cyan,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = "Clear",
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    color = Color.Black
+                )
+            }
         }
     }
 }

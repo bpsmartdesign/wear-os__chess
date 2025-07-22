@@ -51,7 +51,6 @@ class TapInputManager(
         tapBuffer.clear()
         onSequenceUpdate(sequence.toList())
     }
-
     private fun finalizeInput() {
         val move = mapToMove(sequence.toList())
         if (move != null) {
@@ -62,20 +61,67 @@ class TapInputManager(
         onPartialUpdate("")
         onSequenceUpdate(emptyList())
     }
-
     private fun mapToMove(seq: List<Int>): String? {
         if (seq.isEmpty()) return null
 
-        return if (seq.first() == 7 && seq.size == 5) {
-            // Disambiguated move
-            val fromFile = FILE_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
-            val fromRank = RANK_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
-            val toFile = FILE_VIBRATIONS.entries.find { it.value == seq[3] }?.key ?: return null
-            val toRank = RANK_VIBRATIONS.entries.find { it.value == seq[4] }?.key ?: return null
-            val move = "$fromFile$fromRank$toFile$toRank" // e.g. g1f3
+        // 1. Reset signal
+        if (seq.size == 1 && seq[0] == 15) {
+            onPartialUpdate("RESET") //! Check this
+            return "RESET"
+        }
+        // 2. Castle
+        if (seq.size == 1) {
+            val move = if (seq[0] == 8) "O-O" else if (seq[0] == 9) "O-O-O" else null
+            move?.let { onPartialUpdate(it) }
+            return move
+        }
+        // 3. Special disambiguation: 7 + from + to (e.g. Ne4g3)
+        if (seq.first() == 7 && seq.size == 6) {
+            val piece = when (seq[1]) {
+                2 -> "N"
+                3 -> "B"
+                4 -> "R"
+                5 -> "Q"
+                6 -> "K"
+                else -> return null
+            }
+            val fromFile = FILE_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
+            val fromRank = RANK_VIBRATIONS.entries.find { it.value == seq[3] }?.key ?: return null
+            val toFile = FILE_VIBRATIONS.entries.find { it.value == seq[4] }?.key ?: return null
+            val toRank = RANK_VIBRATIONS.entries.find { it.value == seq[5] }?.key ?: return null
+            val move = "$piece$fromFile$toFile$toRank"
+            onPartialUpdate("$piece$fromFile$fromRank$toFile$toRank")
+            return move
+        }
+        // 4. Promotion (10 + piece)
+        if (seq.size == 4 && seq[0] == 10) {
+            val pieceChar = when (seq[3]) {
+                2 -> "N"
+                3 -> "B"
+                4 -> "R"
+                5 -> "Q"
+                6 -> "K"
+                else -> return null
+            }
+            val file = FILE_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
+            val rank = RANK_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
+
+            val move = "${file}${rank}=${pieceChar}"
             onPartialUpdate(move)
-            move
-        } else if (seq.size == 3) {
+            return move
+        }
+        // 5. Pawn capture (e.g. exd5 → e4d5)
+        if (seq.size == 4 && seq[0] == 1) {
+            val fromFile = FILE_VIBRATIONS.entries.find { it.value == seq[0] }?.key ?: return null
+            val fromRank = RANK_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
+            val toFile = FILE_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
+            val toRank = RANK_VIBRATIONS.entries.find { it.value == seq[3] }?.key ?: return null
+            val move = "${fromFile}x${toFile}$toRank"
+            onPartialUpdate("$fromFile$fromRank$toFile$toRank")
+            return move
+        }
+        // 6. Normal move
+        if (seq.size == 3) {
             val piece = when (seq[0]) {
                 1 -> ""
                 2 -> "N"
@@ -85,19 +131,14 @@ class TapInputManager(
                 6 -> "K"
                 else -> return null
             }
-
             val file = FILE_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
             val rank = RANK_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
             val move = "$piece$file$rank"
             onPartialUpdate(move)
-            move
-        } else if(seq.size == 1) {
-            val move = if (seq[0] == 8) "O-O" else "O-O-O"
-            onPartialUpdate(move)
-            move
-        } else {
-            null // Invalid
+            return move
         }
+
+        return null
     }
 }
 

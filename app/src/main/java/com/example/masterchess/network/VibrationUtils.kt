@@ -4,11 +4,6 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 
-// ADD PROMOTE VIBRATION / TAP SEQUENCE (10) FOLLOWED BY PIECE
-// HANDLE TAKING WITH PROMOTION
-// ADD RESET GAME / TAP SEQUENCE (15)
-// PAWN TAKING (5 TAPS SEQUENCE / 2 SEQUENCE VIBRATION) UNLESS SPECIAL MOVE
-// SPECIAL MOVE SHOULD BE REVIEWED (7 XY_DEP XY_DEST) HANDLE  VIBRATION SEQUENCE THE SAME WAY
 val FILE_VIBRATIONS = mapOf(
     'a' to 1, 'b' to 2, 'c' to 3, 'd' to 4,
     'e' to 5, 'f' to 6, 'g' to 7, 'h' to 8
@@ -23,70 +18,106 @@ val PIECE_VIBRATIONS = mapOf(
 )
 
 fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
-    val move = moveRaw.replace("[x:+#]".toRegex(), "") // strip captures/checks
+    val move = moveRaw.replace("[x:+#]".toRegex(), "") // strip check, capture, etc.
     val pattern = mutableListOf<Long>()
+    val pawnMoveRegex = Regex("^[a-h][1-8]$")
+    val pawnTakeRegex = Regex("^[a-h]x[a-h][1-8]$")
+    val normalPieceRegex = Regex("^[NBRQK][a-h][1-8]$")
+    val disambiguateRegex = Regex("^[NBRQK][a-h][1-8][a-h][1-8]$")
 
-    if (move == "O-O") {
-        return vibrateCount(8)
-    } else if (move == "O-O-O") {
-        return vibrateCount(9)
-    }
+    // 1. RESET
+    if (move == "RESET") return vibrateCount(15)
+    // 2. Castling
+    if (move == "O-O") return vibrateCount(8)
+    if (move == "O-O-O") return vibrateCount(9)
+    // 3. Promotion (e.g. e8=Q)
+    if (move.contains("=")) {
+        val file = move[0]
+        val rank = move[1]
+        val promoPiece = move.last().lowercaseChar()
 
-    val pieceChar = if (move.first().isUpperCase() && move.first() != 'O') move.first().lowercaseChar() else 'p'
-    val pureMove = if (pieceChar == 'p') move else move.drop(1)
-
-    // Disambiguation: starts with file or rank
-    var disambiguationFile: Char? = null
-    var disambiguationRank: Char? = null
-    var toFile: Char? = null
-    var toRank: Char? = null
-
-    when (pureMove.length) {
-        2 -> { // e.g. e4
-            toFile = pureMove[0]
-            toRank = pureMove[1]
-        }
-        3 -> { // disambiguation file or rank + target
-            if (pureMove[0] in 'a'..'h') disambiguationFile = pureMove[0]
-            if (pureMove[0] in '1'..'8') disambiguationRank = pureMove[0]
-            toFile = pureMove[1]
-            toRank = pureMove[2]
-        }
-        4 -> { // disambiguation file + rank + target
-            disambiguationFile = pureMove[0]
-            disambiguationRank = pureMove[1]
-            toFile = pureMove[2]
-            toRank = pureMove[3]
-        }
-        else -> return emptyList()
-    }
-
-    // Add disambiguation if needed
-    if (disambiguationFile != null || disambiguationRank != null) {
-        pattern += vibrateCount(7) // disambiguation marker
-        disambiguationFile?.let { pattern += vibrateCount(FILE_VIBRATIONS[it] ?: 1) }
-        disambiguationRank?.let { pattern += vibrateCount(RANK_VIBRATIONS[it] ?: 1) }
+        pattern += vibrateCount(10)
         pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(PIECE_VIBRATIONS[promoPiece] ?: 1)
+        return pattern
+    }
+    // 4. Special disambiguation move (e.g. Neg3 → Ne4g3)
+    if (disambiguateRegex.matches(move)) {
+        val piece = move[0].lowercaseChar()
+        val fromFile = move[1]
+        val fromRank = move[2]
+        val toFile = move[3]
+        val toRank = move[4]
+
+        pattern += vibrateCount(7)
+        pattern += longPause()
+        pattern += vibrateCount(PIECE_VIBRATIONS[piece] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[fromFile] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[fromRank] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[toFile] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[toRank] ?: 1)
+
+        return pattern
+    }
+    // 5. Pawn capture (e.g. exd5 → convert to e4d5)
+    if (pawnTakeRegex.matches(moveRaw)) {
+        val fromFile = moveRaw[0]
+        val toFile = moveRaw[2]
+        val toRank = moveRaw[3]
+
+        pattern += vibrateCount(1) // pawn
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[fromFile] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[toFile] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[toRank] ?: 1)
+        return pattern
+    }
+    // 6. Normal piece move (e.g. Nf3, Rb5, Qd2)
+    if (normalPieceRegex.matches(move)) {
+        val piece = move[0].lowercaseChar()
+        val file = move[1]
+        val rank = move[2]
+
+        pattern += vibrateCount(PIECE_VIBRATIONS[piece] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
+
+        return pattern
+    }
+    // 7. Pawn move (e.g. e4)
+    if (pawnMoveRegex.matches(move)) {
+        val file = move[0]
+        val rank = move[1]
+
+        pattern += vibrateCount(PIECE_VIBRATIONS['p'] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
+        pattern += longPause()
+        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
+
+        return pattern
     }
 
-    // Piece type
-    pattern += vibrateCount(PIECE_VIBRATIONS[pieceChar] ?: 1)
-    pattern += longPause()
-
-    // To square
-    toFile?.let { pattern += vibrateCount(FILE_VIBRATIONS[it] ?: 1) }
-    pattern += longPause()
-    toRank?.let { pattern += vibrateCount(RANK_VIBRATIONS[it] ?: 1) }
-
-    return pattern
+    // fallback (error)
+    return emptyList()
 }
 
 fun vibrateCount(count: Int): List<Long> {
     return List(count * 2) { i -> if (i % 2 == 0) 500L else 100L } // ON/OFF
 }
-
 fun longPause(): List<Long> = listOf(4000L)
-
 fun playVibrations(vibrator: Vibrator?, pattern: List<Long>) {
     val timings = pattern.toLongArray()
     Log.d("VIBRATION", "Pattern: ${pattern.joinToString()}")

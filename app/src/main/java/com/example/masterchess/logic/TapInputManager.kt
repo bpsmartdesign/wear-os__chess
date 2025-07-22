@@ -43,6 +43,14 @@ class TapInputManager(
             }
         }
     }
+    fun clear() {
+        tapBuffer.clear()
+        sequence.clear()
+        lastTapTime = 0L
+        idleJob?.cancel()
+        onPartialUpdate("")
+        onSequenceUpdate(emptyList())
+    }
 
     private fun processTapGroup() {
         if (tapBuffer.isEmpty()) return
@@ -111,11 +119,11 @@ class TapInputManager(
             return move
         }
         // 5. Pawn capture (e.g. exd5 → e4d5)
-        if (seq.size == 4 && seq[0] == 1) {
-            val fromFile = FILE_VIBRATIONS.entries.find { it.value == seq[0] }?.key ?: return null
-            val fromRank = RANK_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
-            val toFile = FILE_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
-            val toRank = RANK_VIBRATIONS.entries.find { it.value == seq[3] }?.key ?: return null
+        if (seq.size == 5 && seq[0] == 1) {
+            val fromFile = FILE_VIBRATIONS.entries.find { it.value == seq[1] }?.key ?: return null
+            val fromRank = RANK_VIBRATIONS.entries.find { it.value == seq[2] }?.key ?: return null
+            val toFile = FILE_VIBRATIONS.entries.find { it.value == seq[3] }?.key ?: return null
+            val toRank = RANK_VIBRATIONS.entries.find { it.value == seq[4] }?.key ?: return null
             val move = "${fromFile}x${toFile}$toRank"
             onPartialUpdate("$fromFile$fromRank$toFile$toRank")
             return move

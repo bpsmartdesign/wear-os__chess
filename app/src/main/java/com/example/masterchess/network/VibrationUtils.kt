@@ -18,31 +18,47 @@ val PIECE_VIBRATIONS = mapOf(
 )
 
 fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
-    val move = moveRaw.replace("[x:+#]".toRegex(), "") // strip check, capture, etc.
+    val move = moveRaw.replace("[x:+#]".toRegex(), "")
     val pattern = mutableListOf<Long>()
     val pawnMoveRegex = Regex("^[a-h][1-8]$")
     val pawnTakeRegex = Regex("^[a-h]x[a-h][1-8]$")
     val normalPieceRegex = Regex("^[NBRQK][a-h][1-8]$")
     val disambiguateRegex = Regex("^[NBRQK][a-h][1-8][a-h][1-8]$")
 
+    // Helper function to add a segment with pauses
+    fun addSegment(count: Int) {
+        if (pattern.isNotEmpty()) {
+            // Add pause between segments
+            pattern += 4000L  // Pause duration
+            pattern += 0L      // Zero vibration for pause
+        }
+        pattern.addAll(vibrateCount(count))
+    }
+
     // 1. RESET
-    if (move == "RESET") return vibrateCount(15)
+    if (move == "RESET") {
+        pattern.addAll(vibrateCount(15))
+        return pattern
+    }
     // 2. Castling
-    if (move == "O-O") return vibrateCount(8)
-    if (move == "O-O-O") return vibrateCount(9)
+    if (move == "O-O") {
+        pattern.addAll(vibrateCount(8))
+        return pattern
+    }
+    if (move == "O-O-O") {
+        pattern.addAll(vibrateCount(9))
+        return pattern
+    }
     // 3. Promotion (e.g. e8=Q)
     if (move.contains("=")) {
         val file = move[0]
         val rank = move[1]
         val promoPiece = move.last().lowercaseChar()
 
-        pattern += vibrateCount(10)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(PIECE_VIBRATIONS[promoPiece] ?: 1)
+        addSegment(10)
+        addSegment(FILE_VIBRATIONS[file] ?: 1)
+        addSegment(RANK_VIBRATIONS[rank] ?: 1)
+        addSegment(PIECE_VIBRATIONS[promoPiece] ?: 1)
         return pattern
     }
     // 4. Special disambiguation move (e.g. Neg3 → Ne4g3)
@@ -53,17 +69,12 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
         val toFile = move[3]
         val toRank = move[4]
 
-        pattern += vibrateCount(7)
-        pattern += longPause()
-        pattern += vibrateCount(PIECE_VIBRATIONS[piece] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[fromFile] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[fromRank] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[toFile] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[toRank] ?: 1)
+        addSegment(7)
+        addSegment(PIECE_VIBRATIONS[piece] ?: 1)
+        addSegment(FILE_VIBRATIONS[fromFile] ?: 1)
+        addSegment(RANK_VIBRATIONS[fromRank] ?: 1)
+        addSegment(FILE_VIBRATIONS[toFile] ?: 1)
+        addSegment(RANK_VIBRATIONS[toRank] ?: 1)
 
         return pattern
     }
@@ -73,13 +84,10 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
         val toFile = moveRaw[2]
         val toRank = moveRaw[3]
 
-        pattern += vibrateCount(1) // pawn
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[fromFile] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[toFile] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[toRank] ?: 1)
+        addSegment(1) // pawn
+        addSegment(FILE_VIBRATIONS[fromFile] ?: 1)
+        addSegment(FILE_VIBRATIONS[toFile] ?: 1)
+        addSegment(RANK_VIBRATIONS[toRank] ?: 1)
         return pattern
     }
     // 6. Normal piece move (e.g. Nf3, Rb5, Qd2)
@@ -88,11 +96,9 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
         val file = move[1]
         val rank = move[2]
 
-        pattern += vibrateCount(PIECE_VIBRATIONS[piece] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
+        addSegment(PIECE_VIBRATIONS[piece] ?: 1)
+        addSegment(FILE_VIBRATIONS[file] ?: 1)
+        addSegment(RANK_VIBRATIONS[rank] ?: 1)
 
         return pattern
     }
@@ -101,11 +107,9 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
         val file = move[0]
         val rank = move[1]
 
-        pattern += vibrateCount(PIECE_VIBRATIONS['p'] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(FILE_VIBRATIONS[file] ?: 1)
-        pattern += longPause()
-        pattern += vibrateCount(RANK_VIBRATIONS[rank] ?: 1)
+        addSegment(PIECE_VIBRATIONS['p'] ?: 1)
+        addSegment(FILE_VIBRATIONS[file] ?: 1)
+        addSegment(RANK_VIBRATIONS[rank] ?: 1)
 
         return pattern
     }
@@ -113,13 +117,19 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
     // fallback (error)
     return emptyList()
 }
-
 fun vibrateCount(count: Int): List<Long> {
-    return List(count * 2) { i -> if (i % 2 == 0) 500L else 100L } // ON/OFF
+    val pattern = mutableListOf<Long>()
+    pattern += 0L // start immediately
+    repeat(count) {
+        pattern += 100L // vibrate
+        if (it < count - 1) {
+            pattern += 300L // pause between vibrations
+        }
+    }
+    return pattern
 }
-fun longPause(): List<Long> = listOf(4000L)
 fun playVibrations(vibrator: Vibrator?, pattern: List<Long>) {
     val timings = pattern.toLongArray()
-    Log.d("VIBRATION", "Pattern: ${pattern.joinToString()}")
+    Log.d("VIBRATION", "Vibration Pattern: ${pattern.joinToString()} (len=${timings.size})")
     vibrator?.vibrate(VibrationEffect.createWaveform(timings, -1))
 }

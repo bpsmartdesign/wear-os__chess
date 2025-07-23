@@ -1,10 +1,14 @@
 package com.example.masterchess.logic
 
+import android.content.Context
+import android.os.VibrationEffect
 import com.example.masterchess.network.FILE_VIBRATIONS
 import com.example.masterchess.network.RANK_VIBRATIONS
 import kotlinx.coroutines.*
+import android.os.Vibrator
 
 class TapInputManager(
+    context: Context,
     private val onMoveReady: (String) -> Unit,
     private val onPartialUpdate: (String) -> Unit = {},
     private val onSequenceUpdate: (List<Int>) -> Unit = {}
@@ -14,6 +18,7 @@ class TapInputManager(
     private val sequence = mutableListOf<Int>()
     private var idleJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
+    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
     fun registerTap(timestamp: Long) {
         val now = timestamp
@@ -51,13 +56,23 @@ class TapInputManager(
         onPartialUpdate("")
         onSequenceUpdate(emptyList())
     }
-
+    fun onVibrate(count: Int) {
+        val pattern = mutableListOf<Long>()
+        pattern += 0L
+        repeat(count) {
+            pattern += 100L
+            pattern += 300L
+        }
+        vibrator.vibrate(VibrationEffect.createWaveform(pattern.toLongArray(), -1))
+    }
     private fun processTapGroup() {
         if (tapBuffer.isEmpty()) return
         val count = tapBuffer.size
         sequence.add(count)
         tapBuffer.clear()
         onSequenceUpdate(sequence.toList())
+
+        onVibrate(1)
     }
     private fun finalizeInput() {
         val move = mapToMove(sequence.toList())
@@ -68,6 +83,8 @@ class TapInputManager(
         sequence.clear()
         onPartialUpdate("")
         onSequenceUpdate(emptyList())
+
+        onVibrate(2)
     }
     private fun mapToMove(seq: List<Int>): String? {
         if (seq.isEmpty()) return null

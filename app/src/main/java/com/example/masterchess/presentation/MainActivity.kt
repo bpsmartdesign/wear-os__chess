@@ -3,7 +3,6 @@ package com.example.masterchess.presentation
 import android.content.Context
 import android.os.Bundle
 import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -257,6 +256,7 @@ fun GameScreen(gameId: String, navController: NavController) {
 
     val manager = remember {
         TapInputManager(
+            context,
             onMoveReady = { userMove ->
                 if (userMove == "RESET") {
                     moveHistory = emptyList()
@@ -325,7 +325,7 @@ fun GameScreen(gameId: String, navController: NavController) {
         "loading" -> "Loading game..."
         "sending" -> "Sending your move..."
         "waiting" -> "Waiting for Stockfish..."
-        else -> "Your turn. Tap to enter move"
+        else -> "Tap to enter move"
     }
 
     Scaffold {
@@ -344,7 +344,6 @@ fun GameScreen(gameId: String, navController: NavController) {
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 🧾 Move History
             Text(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -354,8 +353,6 @@ fun GameScreen(gameId: String, navController: NavController) {
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center
             )
-
-            // 🧠 Live move input or game status
             Text(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -366,7 +363,6 @@ fun GameScreen(gameId: String, navController: NavController) {
                 textAlign = TextAlign.Center
             )
 
-            // 🔄 Spinner during sending
             if (turnStatus == "sending") {
                 CircularProgressIndicator(
                     // color = Color.White,
@@ -378,7 +374,6 @@ fun GameScreen(gameId: String, navController: NavController) {
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // 📊 Tap Log
             Text(
                 text = "Tap Log: ${tapSequence.joinToString()}",
                 color = Color.Gray,
@@ -422,7 +417,7 @@ fun GameScreen(gameId: String, navController: NavController) {
 }
 
 fun buildMoveHistory(moves: List<String>): String {
-    val lastMoves = if (moves.size > 6) moves.takeLast(6) else moves
+    val lastMoves = if (moves.size > 2) moves.takeLast(6) else moves
     return lastMoves
         .chunked(2)
         .withIndex()
@@ -430,7 +425,7 @@ fun buildMoveHistory(moves: List<String>): String {
             val white = pair.getOrNull(0) ?: ""
             val black = pair.getOrNull(1) ?: ""
             val moveNumber = if (moves.size > 6) {
-                (moves.size / 2) - (6 / 2) + i + 1
+                (moves.size / 2) - (2 / 2) + i + 1
             } else {
                 i + 1
             }

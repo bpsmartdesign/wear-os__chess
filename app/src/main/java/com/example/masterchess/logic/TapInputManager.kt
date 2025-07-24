@@ -61,7 +61,7 @@ class TapInputManager(
         pattern += 0L
         repeat(count) {
             pattern += 100L
-            pattern += 300L
+            pattern += 150L
         }
         vibrator.vibrate(VibrationEffect.createWaveform(pattern.toLongArray(), -1))
     }

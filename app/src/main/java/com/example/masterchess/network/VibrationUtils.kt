@@ -126,7 +126,7 @@ fun convertSANMoveToHour(move: String): IntArray {
         // 1. Reset signal
         move == "RESET" -> intArrayOf(12, 0, 0)
 
-        // 2. Castling (matches convertSANMoveToVibrations exactly)
+        // 2. Castling
         move.matches(Regex("^O-O(-O)?[+#]?$")) -> when {
             move.contains("O-O-O") -> intArrayOf(9, 0, 0)  // Queenside (9:00)
             else -> intArrayOf(3, 0, 0)                     // Kingside (3:00)
@@ -141,8 +141,8 @@ fun convertSANMoveToHour(move: String): IntArray {
             }
             intArrayOf(
                 hour,
-                target.last().digitToIntOrNull() ?: 0,
-                target.first().lowercaseChar() - 'a' + 1
+                target.first().lowercaseChar() - 'a' + 1,  // FILE (now minute)
+                target.last().digitToIntOrNull() ?: 0     // RANK (now second)
             )
         }
 
@@ -151,8 +151,8 @@ fun convertSANMoveToHour(move: String): IntArray {
             val target = move.substringAfter('x').take(2)
             intArrayOf(
                 1, // Pawn
-                target.last().digitToIntOrNull() ?: 0,
-                target.first().lowercaseChar() - 'a' + 1
+                target.first().lowercaseChar() - 'a' + 1,  // FILE
+                target.last().digitToIntOrNull() ?: 0      // RANK
             )
         }
 
@@ -166,8 +166,8 @@ fun convertSANMoveToHour(move: String): IntArray {
             }
             intArrayOf(
                 hour,
-                target.last().digitToIntOrNull() ?: 0,
-                target.first().lowercaseChar() - 'a' + 1
+                target.first().lowercaseChar() - 'a' + 1,  // FILE
+                target.last().digitToIntOrNull() ?: 0      // RANK
             )
         }
 
@@ -181,8 +181,8 @@ fun convertSANMoveToHour(move: String): IntArray {
             }
             intArrayOf(
                 hour,
-                target.last().digitToIntOrNull() ?: 0,
-                target.first().lowercaseChar() - 'a' + 1
+                target.first().lowercaseChar() - 'a' + 1,  // FILE
+                target.last().digitToIntOrNull() ?: 0      // RANK
             )
         }
 
@@ -196,8 +196,8 @@ fun convertSANMoveToHour(move: String): IntArray {
             }
             intArrayOf(
                 hour,
-                target.last().digitToIntOrNull() ?: 0,
-                target.first().lowercaseChar() - 'a' + 1
+                target.first().lowercaseChar() - 'a' + 1,  // FILE
+                target.last().digitToIntOrNull() ?: 0      // RANK
             )
         }
 
@@ -205,8 +205,8 @@ fun convertSANMoveToHour(move: String): IntArray {
         move.matches(Regex("^[a-h][1-8][+#]?$")) -> {
             intArrayOf(
                 1, // Pawn
-                move.last().digitToIntOrNull() ?: 0,
-                move.first().lowercaseChar() - 'a' + 1
+                move.first().lowercaseChar() - 'a' + 1,  // FILE
+                move.last().digitToIntOrNull() ?: 0     // RANK
             )
         }
 
@@ -219,9 +219,9 @@ fun convertSANMoveToHour(move: String): IntArray {
     }.let {
         // Ensure valid time values
         intArrayOf(
-            it[0].coerceIn(1..12),
-            it[1].coerceIn(0..59),
-            it[2].coerceIn(0..59)
+            it[0].coerceIn(1..12),    // Piece (hour)
+            it[1].coerceIn(1..8),     // File (minute: a-h → 1-8)
+            it[2].coerceIn(1..8)      // Rank (second: 1-8)
         )
     }
 }

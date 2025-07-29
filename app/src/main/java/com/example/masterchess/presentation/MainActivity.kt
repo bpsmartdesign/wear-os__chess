@@ -41,6 +41,7 @@ import kotlin.math.*
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.example.masterchess.logic.TapInputManager
+import com.example.masterchess.network.convertSANMoveToHour
 import com.example.masterchess.network.convertSANMoveToVibrations
 import com.example.masterchess.network.createGame
 import com.example.masterchess.network.getGame
@@ -51,7 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,24 +150,6 @@ fun WelcomeScreen(navController: NavController) {
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center,
                         color = Color.Black
-                    )
-                }
-                Button(
-                    onClick = { navController.navigate("watch") },
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = 100.dp, minHeight = 10.dp)
-                        .height(30.dp)
-                        .padding(horizontal = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color.Magenta,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(
-                        text = "Show Watch",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -370,6 +353,171 @@ fun NeedleWatchScreen(timeArray: IntArray) {
 @Composable
 fun GameScreen(gameId: String, navController: NavController) {
     val context = LocalContext.current
+    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    val scope = rememberCoroutineScope()
+
+    // Game state variables
+    var playerColor by remember { mutableStateOf("white") }
+    var moveHistory by remember { mutableStateOf<List<String>>(emptyList()) }
+    var livePreview by remember { mutableStateOf("") }
+    var tapSequence by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var turnStatus by remember { mutableStateOf("loading") }
+
+    var currentTime by remember { mutableStateOf(intArrayOf(12, 0, 0)) }
+
+    val hour = currentTime[0]
+    val minute = currentTime[1]
+    val second = currentTime[2]
+
+    val manager = remember {
+        TapInputManager(
+            context,
+            onMoveReady = { userMove ->
+                if (userMove == "RESET") {
+                    moveHistory = emptyList()
+                    livePreview = ""
+                    tapSequence = emptyList()
+                    turnStatus = "loading"
+                    currentTime = intArrayOf(12, 0, 0) // Reset to 12:00:00
+                    navController.navigate("welcome") {
+                        popUpTo("welcome") { inclusive = true }
+                    }
+                    return@TapInputManager
+                }
+
+                livePreview = ""
+                turnStatus = "sending"
+                moveHistory = moveHistory + userMove
+
+                // Update time based on user move
+                currentTime = convertSANMoveToHour(userMove)
+
+                scope.launch {
+                    try {
+                        val stockfishMove = sendUserMove(gameId, userMove)
+                        Log.d("GameScreen", "Stockfish replied with: $stockfishMove")
+                        turnStatus = "waiting"
+
+                        if (stockfishMove.isNotBlank()) {
+                            delay(300)
+                            playVibrations(vibrator, convertSANMoveToVibrations(stockfishMove))
+                            moveHistory = moveHistory + stockfishMove
+
+                            // Update time based on Stockfish move
+                            currentTime = convertSANMoveToHour(stockfishMove)
+                        } else {
+                            Log.w("GameScreen", "Empty stockfishMove, fetching full state as fallback")
+                            val refreshedGame = getGame(gameId)
+                            moveHistory = refreshedGame.moves
+                            // Update time based on latest move
+                            moveHistory.lastOrNull()?.let { lastMove ->
+                                currentTime = convertSANMoveToHour(lastMove)
+                            }
+                        }
+
+                        delay(200)
+                        turnStatus = "ready"
+                    } catch (e: Exception) {
+                        Log.e("GameScreen", "Error during move processing", e)
+                        turnStatus = "ready"
+                    }
+                }
+            },
+            onPartialUpdate = { livePreview = it },
+            onSequenceUpdate = { tapSequence = it }
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        val game = getGame(gameId)
+        playerColor = game.playerColor
+        moveHistory = game.moves
+
+        if (playerColor == "black" && game.moves.isNotEmpty()) {
+            val firstMove = game.moves.first()
+            playVibrations(vibrator, convertSANMoveToVibrations(firstMove))
+            currentTime = convertSANMoveToHour(firstMove)
+        }
+        turnStatus = "ready"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(turnStatus) {
+                if (turnStatus == "ready") {
+                    detectTapGestures(onTap = {
+                        manager.registerTap(System.currentTimeMillis())
+                    })
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Watch face canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val (hour, minute, second) = currentTime
+            val hourAngle = (hour % 12) * 30f + minute * 0.5f
+            val minuteAngle = minute * 6f
+            val secondAngle = second * 6f
+
+            val centerX = size.width / 2
+            val centerY = size.height / 2
+            val radius = min(centerX, centerY) * 0.9f
+
+            // Draw clock face
+            drawCircle(
+                color = Color.DarkGray,
+                radius = radius,
+                center = Offset(centerX, centerY),
+                style = Stroke(width = 4f)
+            )
+
+            // Draw hour markers
+            for (i in 0 until 12) {
+                val angle = i * 30f - 90f
+                val rad = Math.toRadians(angle.toDouble())
+                val startX = centerX + (radius - 20) * cos(rad).toFloat()
+                val startY = centerY + (radius - 20) * sin(rad).toFloat()
+                val endX = centerX + radius * cos(rad).toFloat()
+                val endY = centerY + radius * sin(rad).toFloat()
+
+                drawLine(
+                    color = Color.White,
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 3f
+                )
+            }
+
+            // Draw hands
+            drawHand(centerX, centerY, hourAngle, radius * 0.3f, Color.White, 10f)
+            drawHand(centerX, centerY, minuteAngle, radius * 0.45f, Color.LightGray, 6f)
+            drawHand(centerX, centerY, secondAngle, radius * 0.4f, Color.Red, 3f)
+
+            drawCircle(
+                color = Color.Red,
+                radius = 8f,
+                center = Offset(centerX, centerY)
+            )
+        }
+
+
+        // Display digital time at the bottom
+        Text(
+            text = String.format("%02d:%02d:%02d", hour, minute, second),
+            color = Color.White,
+            fontSize = 14.sp,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp)
+        )
+    }
+}
+
+@Composable
+fun GameScreenOld(gameId: String, navController: NavController) {
+    val context = LocalContext.current
     //val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
     //val vibrator = vibratorManager.getDefaultVibrator();
     val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -542,6 +690,7 @@ fun GameScreen(gameId: String, navController: NavController) {
         }
     }
 }
+
 
 fun buildMoveHistory(moves: List<String>): String {
     val lastMoves = if (moves.size > 2) moves.takeLast(6) else moves

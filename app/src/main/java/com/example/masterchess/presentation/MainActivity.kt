@@ -32,6 +32,12 @@ import androidx.wear.tooling.preview.devices.WearDevices
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.*
 import androidx.navigation.NavController
 import androidx.wear.compose.material.*
 import com.example.masterchess.logic.TapInputManager
@@ -45,6 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,9 +74,8 @@ fun AppNavHost(context: Context = LocalContext.current) {
 
     NavHost(navController, startDestination = "welcome") {
         composable("welcome") {
-            WelcomeScreen { navController.navigate("color") }
+            WelcomeScreen (navController)
         }
-
         composable("color") {
             ColorSelectScreen { chosenColor ->
                 CoroutineScope(Dispatchers.IO).launch {
@@ -81,15 +87,16 @@ fun AppNavHost(context: Context = LocalContext.current) {
                 }
             }
         }
-
         composable("game") {
             GameScreen(gameId, navController)
         }
+        composable("watch") {
+            NeedleWatchScreen(timeArray = intArrayOf(2, 6, 3))
+        }
     }
 }
-
 @Composable
-fun WelcomeScreen(onStartClick: () -> Unit) {
+fun WelcomeScreen(navController: NavController) {
     Scaffold {
         Box(
             modifier = Modifier
@@ -123,7 +130,7 @@ fun WelcomeScreen(onStartClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
-                    onClick = onStartClick,
+                    onClick = { navController.navigate("color") },
                     modifier = Modifier
                         .defaultMinSize(
                             minWidth = 100.dp,
@@ -144,11 +151,28 @@ fun WelcomeScreen(onStartClick: () -> Unit) {
                         color = Color.Black
                     )
                 }
+                Button(
+                    onClick = { navController.navigate("watch") },
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 100.dp, minHeight = 10.dp)
+                        .height(30.dp)
+                        .padding(horizontal = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = Color.Magenta,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = "Show Watch",
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
 }
-
 @Composable
 fun ColorSelectScreen(onColorChosen: (String) -> Unit) {
 
@@ -239,7 +263,110 @@ fun ColorSelectScreen(onColorChosen: (String) -> Unit) {
         }
     }
 }
+@Composable
+fun NeedleWatchScreen(timeArray: IntArray) {
+    // Extract time values from array
+    val hour = timeArray[0]
+    val minute = timeArray[1]
+    val second = timeArray[2]
 
+    // Calculate hand angles
+    val hourAngle = (hour % 12) * 30f + minute * 0.5f  // 30° per hour + 0.5° per minute
+    val minuteAngle = minute * 6f  // 6° per minute
+    val secondAngle = second * 6f  // 6° per second
+
+    // Watch dimensions
+    val center = Offset(0.5f, 0.5f)
+    val hourHandLength = 0.3f
+    val minuteHandLength = 0.45f
+    val secondHandLength = 0.4f
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Calculate center and radius
+            val centerX = size.width / 2
+            val centerY = size.height / 2
+            val radius = min(centerX, centerY) * 0.9f
+
+            // Draw clock face
+            drawCircle(
+                color = Color.DarkGray,
+                radius = radius,
+                center = Offset(centerX, centerY),
+                style = Stroke(width = 4f)
+            )
+
+            // Draw hour markers
+            for (i in 0 until 12) {
+                val angle = i * 30f - 90f  // -90° to start from top
+                val rad = Math.toRadians(angle.toDouble())
+                val startX = centerX + (radius - 20) * cos(rad).toFloat()
+                val startY = centerY + (radius - 20) * sin(rad).toFloat()
+                val endX = centerX + radius * cos(rad).toFloat()
+                val endY = centerY + radius * sin(rad).toFloat()
+
+                drawLine(
+                    color = Color.White,
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 3f
+                )
+            }
+
+            // Draw hour hand
+            drawHand(
+                centerX,
+                centerY,
+                hourAngle,
+                radius * hourHandLength,
+                Color.White,
+                10f
+            )
+
+            // Draw minute hand
+            drawHand(
+                centerX,
+                centerY,
+                minuteAngle,
+                radius * minuteHandLength,
+                Color.LightGray,
+                6f
+            )
+
+            // Draw second hand
+            drawHand(
+                centerX,
+                centerY,
+                secondAngle,
+                radius * secondHandLength,
+                Color.Red,
+                3f
+            )
+
+            // Draw center dot
+            drawCircle(
+                color = Color.Red,
+                radius = 8f,
+                center = Offset(centerX, centerY)
+            )
+        }
+
+        // Display digital time at the bottom
+        Text(
+            text = String.format("%02d:%02d:%02d", hour, minute, second),
+            color = Color.White,
+            fontSize = 14.sp,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp)
+        )
+    }
+}
 @Composable
 fun GameScreen(gameId: String, navController: NavController) {
     val context = LocalContext.current
@@ -396,7 +523,7 @@ fun GameScreen(gameId: String, navController: NavController) {
                     .defaultMinSize(
                         minWidth = 100.dp,
                         minHeight = 10.dp,
-                        )
+                    )
                     .height(30.dp)
                     .padding(horizontal = 8.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -432,11 +559,33 @@ fun buildMoveHistory(moves: List<String>): String {
             "$moveNumber. $white $black"
         }
 }
+private fun DrawScope.drawHand(
+    centerX: Float,
+    centerY: Float,
+    angle: Float,
+    length: Float,
+    color: Color,
+    width: Float
+) {
+    val rad = Math.toRadians(angle.toDouble() - 90)
+    val endX = centerX + length * cos(rad).toFloat()
+    val endY = centerY + length * sin(rad).toFloat()
+
+    drawLine(
+        color = color,
+        start = Offset(centerX, centerY),
+        end = Offset(endX, endY),
+        strokeWidth = width,
+        cap = StrokeCap.Round
+    )
+}
+
 
 @Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
 @Composable
 fun WelcomePreview() {
     MasterChessTheme {
-        WelcomeScreen(onStartClick = {})
+        val navController = rememberNavController()
+        WelcomeScreen(navController)
     }
 }

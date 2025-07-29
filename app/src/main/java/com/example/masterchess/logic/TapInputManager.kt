@@ -165,5 +165,79 @@ class TapInputManager(
 
         return null
     }
+    private fun mapToHour(seq: List<Int>): IntArray {
+        var hour = 12
+        var minute = 0
+        var second = 0
+
+        when {
+            seq.size == 1 && seq[0] == 15 -> return intArrayOf(12, 0, 0)
+
+            seq.size == 1 -> return when (seq[0]) {
+                8 -> intArrayOf(3, 0, 0)   // O-O
+                9 -> intArrayOf(9, 0, 0)   // O-O-O
+                else -> intArrayOf(12, 0, 0)
+            }
+
+            seq.size == 4 && seq[0] == 10 -> {  // Promotion
+                hour = when (seq[3]) {
+                    2 -> 2; 3 -> 3; 4 -> 4; 5 -> 5; 6 -> 6
+                    else -> 12
+                }
+                minute = getRankValue(seq[2])
+                second = getFileValue(seq[1])
+            }
+
+            seq.size == 5 && seq[0] == 1 -> {  // Capture
+                hour = 1
+                minute = getRankValue(seq[4])
+                second = getFileValue(seq[3])
+            }
+
+            seq.size == 3 -> {  // Normal move
+                hour = when (seq[0]) {
+                    1 -> 1; 2 -> 2; 3 -> 3; 4 -> 4; 5 -> 5; 6 -> 6
+                    else -> 12
+                }
+                minute = getRankValue(seq[2])
+                second = getFileValue(seq[1])
+            }
+
+            seq.first() == 7 && seq.size == 6 -> {  // Disambiguation
+                hour = when (seq[1]) {
+                    2 -> 2; 3 -> 3; 4 -> 4; 5 -> 5; 6 -> 6
+                    else -> 12
+                }
+                minute = getRankValue(seq[5])
+                second = getFileValue(seq[4])
+            }
+        }
+
+        return intArrayOf(
+            hour.coerceIn(1..12),
+            minute.coerceIn(0..59),
+            second.coerceIn(0..59)
+        )
+    }
+
+    // Helper functions
+    private fun getRankValue(vibrationPattern: Int): Int {
+        return RANK_VIBRATIONS.entries
+            .find { it.value == vibrationPattern }
+            ?.key
+            ?.toString()
+            ?.toIntOrNull()
+            ?: 0
+    }
+    private fun getFileValue(vibrationPattern: Int): Int {
+        return FILE_VIBRATIONS.entries
+            .find { it.value == vibrationPattern }
+            ?.key
+            ?.toString()
+            ?.lowercase()
+            ?.first()
+            ?.let { it - 'a' + 1 }
+            ?: 0
+    }
 }
 

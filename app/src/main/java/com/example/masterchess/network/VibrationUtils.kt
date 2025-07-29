@@ -117,6 +117,114 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
     // fallback (error)
     return emptyList()
 }
+fun convertSANMoveToHour(move: String): IntArray {
+    // Default to 12:00:00 for invalid moves
+    val defaultTime = intArrayOf(12, 0, 0)
+    if (move.isBlank()) return defaultTime
+
+    return when {
+        // 1. Reset signal
+        move == "RESET" -> intArrayOf(12, 0, 0)
+
+        // 2. Castling (matches convertSANMoveToVibrations exactly)
+        move.matches(Regex("^O-O(-O)?[+#]?$")) -> when {
+            move.contains("O-O-O") -> intArrayOf(9, 0, 0)  // Queenside (9:00)
+            else -> intArrayOf(3, 0, 0)                     // Kingside (3:00)
+        }
+
+        // 3. Promotion (e8=Q or e8=Q+)
+        move.matches(Regex("^[a-h][1-8]=[NBRQ][+#]?$")) -> {
+            val (target, promotedPiece) = move.split("=")
+            val hour = when (promotedPiece[0].uppercaseChar()) {
+                'N' -> 2; 'B' -> 3; 'R' -> 4; 'Q' -> 5
+                else -> 12
+            }
+            intArrayOf(
+                hour,
+                target.last().digitToIntOrNull() ?: 0,
+                target.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 4. Pawn capture (exd5 or exd5+)
+        move.matches(Regex("^[a-h]x[a-h][1-8][+#]?$")) -> {
+            val target = move.substringAfter('x').take(2)
+            intArrayOf(
+                1, // Pawn
+                target.last().digitToIntOrNull() ?: 0,
+                target.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 5. Piece capture (Nxe4 or Nxe4+)
+        move.matches(Regex("^[KQRNB]x[a-h][1-8][+#]?$")) -> {
+            val piece = move[0]
+            val target = move.substringAfter('x').take(2)
+            val hour = when (piece.uppercaseChar()) {
+                'N' -> 2; 'B' -> 3; 'R' -> 4; 'Q' -> 5; 'K' -> 6
+                else -> 12
+            }
+            intArrayOf(
+                hour,
+                target.last().digitToIntOrNull() ?: 0,
+                target.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 6. Disambiguation (Nbd2 or Nbd2+)
+        move.matches(Regex("^[KQRNB][a-h1-8][a-h][1-8][+#]?$")) -> {
+            val piece = move[0]
+            val target = move.takeLast(2)
+            val hour = when (piece.uppercaseChar()) {
+                'N' -> 2; 'B' -> 3; 'R' -> 4; 'Q' -> 5; 'K' -> 6
+                else -> 12
+            }
+            intArrayOf(
+                hour,
+                target.last().digitToIntOrNull() ?: 0,
+                target.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 7. Normal piece moves (Nf3 or Nf3+)
+        move.matches(Regex("^[KQRNB][a-h][1-8][+#]?$")) -> {
+            val piece = move[0]
+            val target = move.substring(1).take(2)
+            val hour = when (piece.uppercaseChar()) {
+                'N' -> 2; 'B' -> 3; 'R' -> 4; 'Q' -> 5; 'K' -> 6
+                else -> 12
+            }
+            intArrayOf(
+                hour,
+                target.last().digitToIntOrNull() ?: 0,
+                target.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 8. Pawn moves (e4 or e4+)
+        move.matches(Regex("^[a-h][1-8][+#]?$")) -> {
+            intArrayOf(
+                1, // Pawn
+                move.last().digitToIntOrNull() ?: 0,
+                move.first().lowercaseChar() - 'a' + 1
+            )
+        }
+
+        // 9. Check/checkmate markers (Nf3# or Qh5+)
+        move.last() in setOf('#', '+') -> {
+            convertSANMoveToHour(move.dropLast(1))
+        }
+
+        else -> defaultTime
+    }.let {
+        // Ensure valid time values
+        intArrayOf(
+            it[0].coerceIn(1..12),
+            it[1].coerceIn(0..59),
+            it[2].coerceIn(0..59)
+        )
+    }
+}
 fun vibrateCount(count: Int): List<Long> {
     val pattern = mutableListOf<Long>()
     pattern += 0L // start immediately

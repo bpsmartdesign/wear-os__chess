@@ -96,9 +96,11 @@ class TapInputManager(
         }
         // 2. Castle
         if (seq.size == 1) {
-            val move = if (seq[0] == 8) "O-O" else if (seq[0] == 9) "O-O-O" else null
-            move?.let { onPartialUpdate(it) }
-            return move
+            return when (seq[0]) {
+                8 -> "O-O"
+                9 -> "O-O-O"
+                else -> null
+            }
         }
         // 3. Special disambiguation: 7 + from + to (e.g. Ne4g3)
         if (seq.first() == 7 && seq.size == 6) {

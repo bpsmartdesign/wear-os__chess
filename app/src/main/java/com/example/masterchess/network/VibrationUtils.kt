@@ -43,12 +43,15 @@ fun convertSANMoveToVibrations(moveRaw: String): List<Long> {
     // 2. Castling
     if (move == "O-O") {
         pattern.addAll(vibrateCount(8))
+        pattern.add(1000L) // extra long pause to distinguish
         return pattern
     }
     if (move == "O-O-O") {
         pattern.addAll(vibrateCount(9))
+        pattern.add(1000L) // extra long pause to distinguish
         return pattern
     }
+
     // 3. Promotion (e.g. e8=Q)
     if (move.contains("=")) {
         val file = move[0]
@@ -128,8 +131,8 @@ fun convertSANMoveToHour(move: String): IntArray {
 
         // 2. Castling
         move.matches(Regex("^O-O(-O)?[+#]?$")) -> when {
-            move.contains("O-O-O") -> intArrayOf(9, 0, 0)  // Queenside (9:00)
-            else -> intArrayOf(3, 0, 0)                     // Kingside (3:00)
+            move.contains("O-O-O") -> intArrayOf(21, 0, 0)  // Queenside (21:00:00)
+            else -> intArrayOf(18, 0, 0)                     // Kingside (18:00:00)
         }
 
         // 3. Promotion (e8=Q or e8=Q+)

@@ -14,7 +14,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private const val BASE_URL = "http://51.68.175.232:3000"
+private const val BASE_URL = "https://stockfish.ajustone.cloud"
 private const val BASE_URL_PC = "http://172.20.10.6:3000"
 private const val BASE_URL_Emulator = "http://10.0.2.2:3000"
 private const val BASE_URL_ONLINE = "https://stockfish-server-2ik3.onrender.com"
